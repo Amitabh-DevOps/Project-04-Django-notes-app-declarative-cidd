@@ -1,41 +1,35 @@
-pipeline {
+pipeline{
     
-    agent any
+    agent any;
     
     stages{
-        stage("Clone The code..."){
+        
+        stage("Code"){
             steps{
-                echo "Cloning the code"
-                git url: "https://github.com/Amitabh-DevOps/Django-notes-app-declarative-cidd.git", branch: "main"
+               script{
+                clone("https://github.com/LondheShubham153/django-notes-app.git","main")
+               }
+                
             }
         }
-        stage("Build and Test..."){
+        stage("Build"){
             steps{
-                echo "Building the Docker image(Container)"
-                sh "docker build . -t cicd-note-app:latest"
-            }
-        }
-        stage("Push build to Docker Hub"){
-            steps{
-                echo "Pushing build to DockerHub..."
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: "dockerHub",
-                        passwordVariable: "dockerHubPass",
-                        usernameVariable: "dockerHubUser"
-                    )    
-                ]){
-                    sh "docker tag cicd-note-app ${env.dockerHubUser}/cicd-note-app:latest"
-                    sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
-                    sh "docker push ${env.dockerHubUser}/cicd-note-app:latest"
+                script{
+                docker_build("notes-app","latest","trainwithshubham")
                 }
             }
         }
-        stage("Deploy the Container"){
+        stage("Push to DockerHub"){
             steps{
-                echo "Deploying docker Container..."
+                script{
+                    docker_push("notes-app","latest","amitabhdevops")
+                }
+            }
+        }
+        stage("Deploy"){
+            steps{
+                echo "This is deploying the code"
                 sh "docker compose down && docker compose up -d"
-                
             }
         }
     }
