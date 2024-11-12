@@ -1,35 +1,40 @@
+@Library('Shared')_
+
 pipeline{
-    
-    agent any;
+    agent {label 'dev-server'}
     
     stages{
-        
         stage("Code"){
             steps{
-               script{
-                clone("https://github.com/LondheShubham153/django-notes-app.git","main")
-               }
-                
+                clone("https://github.com/Amitabh-DevOps/Project-04-Django-notes-app-declarative-cidd.git","dev")
+                // git url: "https://github.com/Amitabh-DevOps/Project-04-Django-notes-app-declarative-cidd.git" , branch: "dev"
+                echo "Code clonning done."
             }
         }
-        stage("Build"){
+        stage("Build"){                                                             
             steps{
-                script{
-                docker_build("notes-app","latest","trainwithshubham")
-                }
+                dockerbuild("django-notes-app","latest")
+                // sh "docker build -t notes-app ."
+                echo "Code build bhi hogaya."
             }
         }
         stage("Push to DockerHub"){
             steps{
-                script{
-                    docker_push("notes-app","latest","amitabhdevops")
-                }
+                // withCredentials([usernamePassword (credentialsId: "dockerHub", passwordVariable: "dockerHubPass", usernameVariable: "dockerHubUser")])
+                // {
+                //     sh "docker image tag notes-app ${env.dockerHubUser}/django-notes-app:latest"
+                //     sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
+                //     sh "docker push ${env.dockerHubUser}/django-notes-app:latest"
+                // }
+                dockerpush("dockerHub","django-notes-app","latest")
+                echo "Push to dockerHub is also done."
             }
         }
-        stage("Deploy"){
+        stage("Deplying"){
             steps{
-                echo "This is deploying the code"
-                sh "docker compose down && docker compose up -d"
+                deploy()
+                // sh "docker compose down && docker compose up -d --build"
+                echo "Deployment bhi done."
             }
         }
     }
