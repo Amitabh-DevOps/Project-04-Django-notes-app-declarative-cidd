@@ -73,26 +73,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha,format=short
-            latest
-      
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
+          tags: latest
+          
   # Deploy to staging environment (AWS EC2)
   deploy-staging:
     name: Deploy to Staging EC2
@@ -129,14 +116,14 @@ jobs:
             docker stop django-notes-app || true
             docker rm django-notes-app || true
             
-            # LEARNING POINT: ${GITHUB_SHA::7} is Bash syntax for substring extraction
+            # LEARNING POINT: latest is Bash syntax for substring extraction
             # It takes the first 7 characters of the full commit SHA
             # This creates a shorter, more manageable tag for the Docker image
-            echo "Pulling image ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}"
-            docker pull ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            echo "Pulling image ${{ env.IMAGE_NAME }}:latest"
+            docker pull ${{ env.IMAGE_NAME }}:latest
             
             # Run the container 
-            docker run -d --name django-notes-app -p 8000:8000 ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            docker run -d --name django-notes-app -p 8000:8000 ${{ env.IMAGE_NAME }}:latest
             
             # Clean up unused images
             docker system prune -af
@@ -177,14 +164,14 @@ jobs:
             docker stop django-notes-app || true
             docker rm django-notes-app || true
             
-            # LEARNING POINT: ${GITHUB_SHA::7} is Bash syntax for substring extraction
+            # LEARNING POINT: latest is Bash syntax for substring extraction
             # It takes the first 7 characters of the full commit SHA
             # This creates a shorter, more manageable tag for the Docker image
-            echo "Pulling image ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}"
-            docker pull ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            echo "Pulling image ${{ env.IMAGE_NAME }}:latest"
+            docker pull ${{ env.IMAGE_NAME }}:latest
             
             # Run the container
-            docker run -d --name django-notes-app -p 8000:8000 ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            docker run -d --name django-notes-app -p 8000:8000 ${{ env.IMAGE_NAME }}:latest
             
             # Clean up unused images
             docker system prune -af
