@@ -46,14 +46,19 @@ jobs:
         run: |
           docker run --rm ${{ env.IMAGE_NAME }}:test python manage.py test
       
-      - name: Install security tools in container
-        run: |
-          docker run --rm ${{ env.IMAGE_NAME }}:test pip install bandit safety
+      # - name: Install security tools in container
+      #   run: |
+      #     docker run --rm ${{ env.IMAGE_NAME }}:test pip install bandit safety
       
+      # - name: Run security scan
+      #   run: |
+      #     docker run --rm ${{ env.IMAGE_NAME }}:test bandit -r . -x tests/
+      #     docker run --rm ${{ env.IMAGE_NAME }}:test safety check
+
       - name: Run security scan
         run: |
-          docker run --rm ${{ env.IMAGE_NAME }}:test bandit -r . -x tests/
-          docker run --rm ${{ env.IMAGE_NAME }}:test safety check
+          docker run --rm ${{ env.IMAGE_NAME }}:test sh -c "pip install bandit safety && bandit -r . -x tests/ && safety check"
+
 
   # Build and push production image
   build-and-push:
