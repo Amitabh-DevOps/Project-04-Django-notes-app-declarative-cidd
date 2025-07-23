@@ -104,7 +104,6 @@ jobs:
     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
     environment:
       name: staging
-      url: http://${{ secrets.STAGING_EC2_IP }}:8000
     
     steps:
       - name: Deploy to EC2
@@ -156,7 +155,6 @@ jobs:
     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
     environment:
       name: production
-      url: http://${{ secrets.PRODUCTION_EC2_IP }}:8000
     
     steps:
       - name: Deploy to EC2
