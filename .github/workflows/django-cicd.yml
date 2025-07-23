@@ -45,15 +45,6 @@ jobs:
       - name: Run tests
         run: |
           docker run --rm ${{ env.IMAGE_NAME }}:test python manage.py test
-      
-      # - name: Install security tools in container
-      #   run: |
-      #     docker run --rm ${{ env.IMAGE_NAME }}:test pip install bandit safety
-      
-      # - name: Run security scan
-      #   run: |
-      #     docker run --rm ${{ env.IMAGE_NAME }}:test bandit -r . -x tests/
-      #     docker run --rm ${{ env.IMAGE_NAME }}:test safety check
 
       - name: Run security scan
         run: |
@@ -144,11 +135,8 @@ jobs:
             echo "Pulling image ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}"
             docker pull ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
             
-            # Run the container with environment variables
-            docker run -d \
-              --name django-notes-app \
-              -p 8000:8000 \
-              ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            # Run the container 
+            docker run -d --name django-notes-app -p 8000:8000 ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
             
             # Clean up unused images
             docker system prune -af
@@ -195,11 +183,8 @@ jobs:
             echo "Pulling image ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}"
             docker pull ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
             
-            # Run the container with environment variables
-            docker run -d \
-              --name django-notes-app \
-              -p 8000:8000 \
-              ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            # Run the container
+            docker run -d --name django-notes-app -p 8000:8000 ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
             
             # Clean up unused images
             docker system prune -af
