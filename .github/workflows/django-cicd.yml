@@ -79,6 +79,8 @@ jobs:
           context: .
           push: true
           tags: latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           
   # Deploy to staging environment (AWS EC2)
   deploy-staging:
