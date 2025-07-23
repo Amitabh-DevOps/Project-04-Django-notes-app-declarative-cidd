@@ -1,0 +1,215 @@
+name: Django Notes App CI/CD
+
+on:
+  # push:
+  #   branches: [main, develop]
+  # pull_request:
+  #   branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  DOCKER_REGISTRY: docker.io
+  IMAGE_NAME: amitabhdevops/cicd-note-app
+
+jobs:
+  # Build and test Docker image
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build and export Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Run tests
+        run: |
+          docker run --rm ${{ env.IMAGE_NAME }}:test python manage.py test
+      
+      - name: Install security tools in container
+        run: |
+          docker run --rm ${{ env.IMAGE_NAME }}:test pip install bandit safety
+      
+      - name: Run security scan
+        run: |
+          docker run --rm ${{ env.IMAGE_NAME }}:test bandit -r . -x tests/
+          docker run --rm ${{ env.IMAGE_NAME }}:test safety check
+
+  # Build and push production image
+  build-and-push:
+    name: Build and Push Production Image
+    runs-on: ubuntu-latest
+    # Always build and push the image, even for pull requests
+    # This ensures we always have the latest image available
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short
+            latest
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to staging environment (AWS EC2)
+  deploy-staging:
+    name: Deploy to Staging EC2
+    runs-on: ubuntu-latest
+    needs: [build-and-test, build-and-push]
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: http://${{ secrets.STAGING_EC2_IP }}:8000
+    
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script: |
+            # Update system
+            echo "Updating system..."
+            sudo apt update -y
+
+            # LEARNING POINT: Conditional installation of Docker
+            # Install Docker if not present
+            if ! command -v docker &> /dev/null
+            then
+              echo "Installing Docker..."
+              sudo apt install -y docker.io
+              sudo systemctl enable docker
+              sudo systemctl start docker
+              sudo usermod -aG docker ubuntu
+            fi
+            
+            # Stop any running container
+            docker stop django-notes-app || true
+            docker rm django-notes-app || true
+            
+            # LEARNING POINT: ${GITHUB_SHA::7} is Bash syntax for substring extraction
+            # It takes the first 7 characters of the full commit SHA
+            # This creates a shorter, more manageable tag for the Docker image
+            echo "Pulling image ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}"
+            docker pull ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            
+            # Run the container with environment variables
+            docker run -d \
+              --name django-notes-app \
+              -p 8000:8000 \
+              ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            
+            # Clean up unused images
+            docker system prune -af
+
+  # Deploy to production environment (AWS EC2)
+  deploy-production:
+    name: Deploy to Production EC2
+    runs-on: ubuntu-latest
+    needs: [build-and-test, build-and-push]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment:
+      name: production
+      url: http://${{ secrets.PRODUCTION_EC2_IP }}:8000
+    
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          script: |
+            # Update system
+            echo "Updating system..."
+            sudo apt update -y
+
+            # LEARNING POINT: Conditional installation of Docker
+            # Install Docker if not present
+            if ! command -v docker &> /dev/null
+            then
+              echo "Installing Docker..."
+              sudo apt install -y docker.io
+              sudo systemctl enable docker
+              sudo systemctl start docker
+              sudo usermod -aG docker ubuntu
+            fi
+            
+            # Stop any running container
+            docker stop django-notes-app || true
+            docker rm django-notes-app || true
+            
+            # LEARNING POINT: ${GITHUB_SHA::7} is Bash syntax for substring extraction
+            # It takes the first 7 characters of the full commit SHA
+            # This creates a shorter, more manageable tag for the Docker image
+            echo "Pulling image ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}"
+            docker pull ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            
+            # Run the container with environment variables
+            docker run -d \
+              --name django-notes-app \
+              -p 8000:8000 \
+              ${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}
+            
+            # Clean up unused images
+            docker system prune -af
+      
+      - name: Create release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: release-${{ github.run_number }}
+          release_name: Release ${{ github.run_number }}
+          body: |
+            Release ${{ github.run_number }} deployed to production.
+            
+            Changes in this release:
+            ${{ github.event.head_commit.message }}
+          draft: false
+          prerelease: false
